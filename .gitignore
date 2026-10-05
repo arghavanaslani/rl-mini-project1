@@ -1,0 +1,15 @@
+# Python environment
+.venv/
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# rl_mind run outputs (tensorboard logs, videos, saved actors)
+outputs/
+outputs-testing/
+runs/
+
+# macOS
+.DS_Store
