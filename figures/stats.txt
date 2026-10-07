@@ -1,0 +1,7 @@
+LayerNorm vs no LayerNorm (mean ± std over seeds; two-sided tests; final = mean of the last 3 evaluations; TD3 critic: q1)
+DDPG  final_reward             without LN    -77.3 ±   76.4 (n=5)  with LN   -100.0 ±   76.2 (n=5)  Welch t= -0.47 p=0.6512  Mann-Whitney U= 9.0 p=0.5476
+TD3   final_reward             without LN    137.7 ±   81.1 (n=5)  with LN    154.3 ±   65.3 (n=5)  Welch t=  0.36 p=0.7306  Mann-Whitney U=13.0 p=1.0000
+DDPG  final_bias               without LN    204.9 ±   56.2 (n=5)  with LN    382.6 ±   96.2 (n=5)  Welch t=  3.57 p=0.0105  Mann-Whitney U=23.0 p=0.0317
+TD3   final_bias               without LN    -19.2 ±   17.8 (n=5)  with LN    -11.4 ±   14.4 (n=5)  Welch t=  0.75 p=0.4743  Mann-Whitney U=15.0 p=0.6905
+DDPG  mean_bias_over_training  without LN    232.1 ±   79.6 (n=5)  with LN    337.5 ±   43.9 (n=5)  Welch t=  2.59 p=0.0396  Mann-Whitney U=22.0 p=0.0556
+TD3   mean_bias_over_training  without LN    -14.1 ±   15.0 (n=5)  with LN     -2.5 ±    6.5 (n=5)  Welch t=  1.59 p=0.1685  Mann-Whitney U=18.0 p=0.3095
