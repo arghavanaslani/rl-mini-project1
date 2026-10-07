@@ -233,6 +233,7 @@ def measure_bias(
         "n_samples": len(all_returns),
         "n_terminated_episodes": n_terminated,
         "mean_return_mc": float(np.mean(all_returns)) if all_returns else None,
+        "mean_abs_return_mc": float(np.mean(np.abs(all_returns))) if all_returns else None,
     }
     if not all_returns:
         return result
@@ -256,7 +257,7 @@ def measure_bias(
 
 # [NEW] Evaluation + bias measurement, logged together
 def log_evaluation(log: dict, result, actor, critics, cfg: DDPGConfig):
-    bias = measure_bias(actor, critics, cfg, seed=cfg.seed * 100_000 + result.step)
+    bias = measure_bias(actor, critics, cfg, seed=cfg.seed * 10_000_000 + result.step)
     log["evaluations"].append(
         {
             "step": result.step,
@@ -447,6 +448,14 @@ def main():
     config_class = TD3Config if args.algo == "td3" else DDPGConfig
     cfg = config_class(seed=args.seed, max_steps=args.steps, layernorm=args.layernorm)
     name = f"{args.algo}{'-ln' if args.layernorm else ''}-s{args.seed}"
+
+    # skip the runs that are already done
+    outdir = Path(args.outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    path = outdir / f"{name}.json"
+    if path.exists():
+        print(f"{name} already done ({path}), skipping", flush=True)
+        return
     print(f"Running {name}: {cfg}", flush=True)
 
     start = time.time()
@@ -454,9 +463,6 @@ def main():
     log["wall_time_min"] = (time.time() - start) / 60
     log["versions"] = {"torch": torch.__version__, "gymnasium": gym.__version__}
 
-    outdir = Path(args.outdir)
-    outdir.mkdir(parents=True, exist_ok=True)
-    path = outdir / f"{name}.json"
     path.write_text(json.dumps(log, indent=1))
     print(f"Done in {log['wall_time_min']:.1f} min, results in {path}", flush=True)
 
