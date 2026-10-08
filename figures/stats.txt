@@ -5,3 +5,8 @@ DDPG  final_bias               without LN    204.9 ±   56.2 (n=5)  with LN    3
 TD3   final_bias               without LN    -19.2 ±   17.8 (n=5)  with LN    -11.4 ±   14.4 (n=5)  Welch t=  0.75 p=0.4743  Mann-Whitney U=15.0 p=0.6905
 DDPG  mean_bias_over_training  without LN    232.1 ±   79.6 (n=5)  with LN    337.5 ±   43.9 (n=5)  Welch t=  2.59 p=0.0396  Mann-Whitney U=22.0 p=0.0556
 TD3   mean_bias_over_training  without LN    -14.1 ±   15.0 (n=5)  with LN     -2.5 ±    6.5 (n=5)  Welch t=  1.59 p=0.1685  Mann-Whitney U=18.0 p=0.3095
+
+Spearman correlation between final bias and final performance
+all runs  rho= -0.87  p=0.0000  (n=20)
+DDPG      rho= -0.61  p=0.0600  (n=10)
+TD3       rho= -0.33  p=0.3466  (n=10)

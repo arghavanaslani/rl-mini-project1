@@ -9,8 +9,12 @@ Reads every `results/*.json` and writes, in `figures/`:
 
 - `learning_curves.pdf/.png`: evaluation return along training
 - `bias.pdf/.png`: critic bias (Q - Monte Carlo return) along training
+- `bias_vs_performance.pdf/.png`: final bias vs final performance, one point
+  per run
 - `runs.csv`: one row per run (final performance, final and average bias)
-- `stats.txt`: LayerNorm vs no LayerNorm tests, for each algorithm
+- `stats.txt`: LayerNorm vs no LayerNorm tests, for each algorithm, and the
+  Spearman correlation between final bias and final performance (all runs,
+  and within each algorithm)
 
 Variability across seeds is shown as a 95% confidence interval of the mean
 (Student t, n = number of seeds).
@@ -33,6 +37,7 @@ STYLES = {
     False: dict(color="#2a78d6", linestyle="-", marker="o", label="without LayerNorm"),
     True: dict(color="#eb6834", linestyle="--", marker="s", label="with LayerNorm"),
 }
+ALGO_MARKERS = {"ddpg": "o", "td3": "^"}
 TEXT = "#0b0b0b"
 TEXT_SECONDARY = "#52514e"
 GRID = "#e4e3df"
@@ -169,6 +174,49 @@ def compare(rows, algo: str, measure: str) -> str:
     )
 
 
+def spearman(rows, algo: str | None) -> tuple[float, float, int]:
+    """Spearman correlation between final bias and final performance"""
+    selected = [r for r in rows if algo is None or r["algo"] == algo]
+    result = stats.spearmanr(
+        [r["final_bias"] for r in selected], [r["final_reward"] for r in selected]
+    )
+    return result.statistic, result.pvalue, len(selected)
+
+
+def plot_bias_vs_performance(rows, correlations: dict, path: Path):
+    """One point per run: final bias (x) vs final performance (y)"""
+    fig, ax = plt.subplots(figsize=(4.6, 3.4))
+    for algo in ALGOS:
+        for layernorm in (False, True):
+            selected = [r for r in rows if r["algo"] == algo and r["layernorm"] == layernorm]
+            if not selected:
+                continue
+            ax.scatter(
+                [r["final_bias"] for r in selected],
+                [r["final_reward"] for r in selected],
+                marker=ALGO_MARKERS[algo], s=42, color=STYLES[layernorm]["color"],
+                edgecolors="white", linewidths=1.0, zorder=3,
+                label=f"{ALGO_NAMES[algo]}, {STYLES[layernorm]['label']}",
+            )
+    ax.axvline(0, color=TEXT_SECONDARY, linewidth=0.8)
+    ax.set_xlabel("final bias: Q − Monte Carlo return", color=TEXT)
+    ax.set_ylabel("final evaluation return", color=TEXT)
+    text = "\n".join(
+        f"{name}: ρ = {rho:.2f}, " + ("p < 0.001" if p < 0.001 else f"p = {p:.3f}") + f" (n={n})"
+        for name, (rho, p, n) in correlations.items()
+    )
+    ax.text(0.98, 0.97, "Spearman " + text, transform=ax.transAxes, ha="right", va="top",
+            fontsize=7.5, color=TEXT_SECONDARY)
+    style_axes(ax)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=2, fontsize=7.5,
+              frameon=False)
+    ax.set_title("Final bias vs final performance (one point per run)", color=TEXT, fontsize=10)
+    fig.tight_layout()
+    for suffix in (".pdf", ".png"):
+        fig.savefig(path.with_suffix(suffix), dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--results", default="results")
@@ -203,6 +251,16 @@ def main():
     for measure in ("final_reward", "final_bias", "mean_bias_over_training"):
         for algo in ALGOS:
             lines.append(compare(rows, algo, measure))
+
+    # Q2: does a larger bias go with a lower performance?
+    correlations = {"all runs": spearman(rows, None)}
+    for algo in ALGOS:
+        correlations[ALGO_NAMES[algo]] = spearman(rows, algo)
+    plot_bias_vs_performance(rows, correlations, out / "bias_vs_performance")
+    lines.append("")
+    lines.append("Spearman correlation between final bias and final performance")
+    for name, (rho, p, n) in correlations.items():
+        lines.append(f"{name:9} rho={rho:6.2f}  p={p:.4f}  (n={n})")
     text = "\n".join(lines)
     (out / "stats.txt").write_text(text + "\n")
     print(text)
