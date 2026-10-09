@@ -124,13 +124,13 @@ def plot_curves(runs, key: str, ylabel: str, title: str, path: Path, zero_line=F
         if zero_line:
             ax.axhline(0, color=TEXT_SECONDARY, linewidth=0.8)
         ax.set_title(ALGO_NAMES[algo], color=TEXT, fontsize=10)
-        ax.set_xlabel("environment steps (×1000)", color=TEXT)
+        ax.set_xlabel("environment steps (x1000)", color=TEXT)
         style_axes(ax)
     axes[0].set_ylabel(ylabel, color=TEXT)
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="lower center", ncol=2, frameon=False, fontsize=8.5,
                bbox_to_anchor=(0.5, -0.02))
-    fig.suptitle(title, color=TEXT, fontsize=11)
+    #fig.suptitle(title, color=TEXT, fontsize=11)
     fig.tight_layout(rect=(0, 0.07, 1, 1))
     for suffix in (".pdf", ".png"):
         fig.savefig(path.with_suffix(suffix), dpi=200, bbox_inches="tight")
@@ -234,7 +234,7 @@ def plot_bias_vs_performance(rows, correlations: dict, path: Path):
                 label=f"{ALGO_NAMES[algo]}, {STYLES[layernorm]['label']}",
             )
     ax.axvline(0, color=TEXT_SECONDARY, linewidth=0.8)
-    ax.set_xlabel("final bias: Q − Monte Carlo return", color=TEXT)
+    ax.set_xlabel("final bias : Q - Monte Carlo return", color=TEXT)
     ax.set_ylabel("final evaluation return", color=TEXT)
     text = "\n".join(
         f"{name}: ρ = {rho:.2f}, " + ("p < 0.001" if p < 0.001 else f"p = {p:.3f}") + f" (n={n})"
@@ -245,7 +245,7 @@ def plot_bias_vs_performance(rows, correlations: dict, path: Path):
     style_axes(ax)
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=2, fontsize=7.5,
               frameon=False)
-    ax.set_title("Final bias vs final performance (one point per run)", color=TEXT, fontsize=10)
+    #ax.set_title("Final bias vs final performance (one point per run)", color=TEXT, fontsize=10)
     fig.tight_layout()
     for suffix in (".pdf", ".png"):
         fig.savefig(path.with_suffix(suffix), dpi=200, bbox_inches="tight")
@@ -270,7 +270,7 @@ def main():
 
     plot_curves(runs, "reward", "evaluation return",
                 "Performance on LunarLanderContinuous-v3", out / "learning_curves")
-    plot_curves(runs, "bias", "bias: Q − Monte Carlo return",
+    plot_curves(runs, "bias", "bias : Q - Monte Carlo return",
                 "Critic bias along training", out / "bias", zero_line=True)
 
     rows = summarize(runs, args.last)
