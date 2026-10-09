@@ -1,17 +1,12 @@
-"""Train DDPG or TD3 on LunarLanderContinuous-v3 and measure the critic's bias
+"""
+Train DDPG or TD3 on LunarLanderContinuous-v3 and measure the critic's bias
 
-Built from the code of `04-ddpg-td3.ipynb`. Differences with the notebook are
-marked with `# [NEW]` (added) or `# [CHANGED]` (modified).
-
-Usage (from the project directory, with the virtual environment activated):
-
-    python train.py --algo td3 --seed 1
-    python train.py --algo ddpg --layernorm --seed 3 --steps 300000
+uv run train.py --algo td3 --seed 1
+uv run train.py --algo ddpg --layernorm --seed 3 --steps 300000
 
 Each run writes one JSON file in `results/` with its configuration, all the
 evaluations, and the bias measurements.
 """
-
 import argparse
 import copy
 import json
@@ -33,17 +28,10 @@ from rl_mind.env import VecEnv
 from rl_mind.evaluation import Evaluator
 from rl_mind.nn import build_mlp, soft_update
 
-
-# ---------------------------------------------------------------------------
 # Agents
-# ---------------------------------------------------------------------------
-
 
 class ContinuousQNetwork(nn.Module):
-    """The Q-network $Q(s, a)$ for continuous actions"""
-
-    # [CHANGED] optional LayerNorm after each hidden linear layer:
-    # Linear -> LayerNorm -> ReLU instead of Linear -> ReLU
+    # Q-network $Q(s, a)$ for continuous actions
     def __init__(
         self,
         obs_dim: int,
@@ -64,7 +52,7 @@ class ContinuousQNetwork(nn.Module):
         self.model = nn.Sequential(*layers)
 
     def forward(self, obs: Tensor, action: Tensor) -> Tensor:
-        """Compute $Q(s, a)$ for a batch: `[B, obs_dim] x [B, action_dim] -> [B]`"""
+        # Compute Q(s, a) for a batch [B, obs_dim] x [B, action_dim] -> [B]
         return self.model(torch.cat([obs, action], dim=1)).squeeze(-1)
 
 
@@ -80,7 +68,7 @@ class ContinuousDeterministicActor(Actor[Action]):
 
 
 class GaussianNoise(Actor[Action]):
-    """Adds Gaussian noise to the actions of another actor (at training time)"""
+    # Adds Gaussian noise to the actions of another actor (at training time)
 
     def __init__(self, actor: Actor[Action], sigma: float):
         super().__init__()
@@ -94,11 +82,7 @@ class GaussianNoise(Actor[Action]):
     def act(self, obs: Tensor) -> Tensor:
         return self.actor.act(obs)
 
-
-# ---------------------------------------------------------------------------
 # Losses
-# ---------------------------------------------------------------------------
-
 
 def compute_critic_loss(
     gamma: float, batch: Transitions[Action], q_values: Tensor, next_q_values: Tensor
@@ -110,36 +94,31 @@ def compute_critic_loss(
 def compute_actor_loss(q_values: Tensor) -> Tensor:
     return -q_values.mean()
 
-
-# ---------------------------------------------------------------------------
 # Hyper-parameters
-# ---------------------------------------------------------------------------
-
 
 @dataclass(frozen=True)
 class DDPGConfig:
-    # [CHANGED] LunarLander and its hyper-parameters (see the report)
     env_name: str = "LunarLanderContinuous-v3"
     seed: int = 1
 
-    #: Total number of environment steps
+    # Total number of environment steps
     max_steps: int = 300_000
-    #: Number of parallel training environments
+    # Number of parallel training environments
     n_envs: int = 1
-    #: Environment steps between two gradient updates
+    # Environment steps between two gradient updates
     steps_per_update: int = 1
-    #: Steps before learning starts
+    # Steps before learning starts
     learning_starts: int = 10_000
 
-    #: Replay buffer capacity
+    # Replay buffer capacity
     buffer_size: int = 1_000_000
     batch_size: int = 256
 
-    #: Discount factor
+    # Discount factor
     gamma: float = 0.99
-    #: Target network update coefficient
+    # Target network update coefficient
     tau: float = 0.005
-    #: Exploration noise
+    # Exploration noise
     action_noise: float = 0.1
 
     actor_hidden: tuple[int, ...] = (256, 256)
@@ -147,49 +126,33 @@ class DDPGConfig:
     lr_actor: float = 3e-4
     lr_critic: float = 3e-4
 
-    #: Steps between two evaluations, and number of evaluation episodes
+    # Steps between two evaluations, and number of evaluation episodes
     eval_interval: int = 10_000
     n_eval_envs: int = 10
 
-    # [NEW] LayerNorm in the critic(s)
+    # LayerNorm in the critic.s
     layernorm: bool = False
-    # [NEW] Bias measurement (done right after each evaluation): number of
-    # episodes played with the deterministic actor, and number of steps that
-    # must remain before a truncation for a Monte Carlo return to be kept
+    # Bias measurement
     n_bias_episodes: int = 5
     bias_horizon: int = 500
 
 
 @dataclass(frozen=True)
 class TD3Config(DDPGConfig):
-    #: Number of critic updates between two policy updates
+    # Number of critic updates between two policy updates
     policy_delay: int = 2
-    #: Std of the noise added to the target policy actions
+    # Std of the noise added to the target policy actions
     target_noise: float = 0.2
-    #: Clipping of the target policy noise
+    # Clipping of the target policy noise
     target_noise_clip: float = 0.5
 
-
-# ---------------------------------------------------------------------------
-# [NEW] Bias measurement: critic's Q(s, a) vs Monte Carlo returns
-# ---------------------------------------------------------------------------
-
+# Bias measurement: critic's Q(s, a) vs Monte Carlo returns
 
 def measure_bias(
     actor: Actor, critics: dict[str, nn.Module], cfg: DDPGConfig, seed: int
 ) -> dict:
-    """Compare the critics' Q-values with Monte Carlo returns
+    # Compare the critics' Q-values with Monte Carlo returns
 
-    Plays `cfg.n_bias_episodes` episodes with the deterministic actor
-    (`actor.act`, no exploration noise), computes the discounted return
-    $G_t$ of every visited $(s_t, a_t)$ backward, and keeps the time steps
-    whose return is complete: all the steps of a terminated episode, and the
-    steps with at least `cfg.bias_horizon` steps left in a truncated one.
-
-    :param critics: The critics to evaluate, by name (e.g. `{"q1": ..., "q2": ...}`)
-    :returns: For each critic, the mean and std of $Q(s_t, a_t) - G_t$ and the
-        mean $Q$, plus the mean $G_t$ and the number of kept time steps
-    """
     env = gym.make(cfg.env_name)
     all_obs, all_actions, all_returns = [], [], []
     n_terminated = 0
@@ -209,7 +172,6 @@ def measure_bias(
             obs = next_obs
             done = terminated or truncated
 
-        # Discounted returns, computed backward: G_t = r_{t+1} + gamma * G_{t+1}
         T = len(rewards)
         returns = np.zeros(T)
         g = 0.0
@@ -217,7 +179,6 @@ def measure_bias(
             g = rewards[t] + cfg.gamma * g
             returns[t] = g
 
-        # Keep only the complete returns
         if terminated:
             n_terminated += 1
             keep = T
@@ -254,8 +215,6 @@ def measure_bias(
         }
     return result
 
-
-# [NEW] Evaluation + bias measurement, logged together
 def log_evaluation(log: dict, result, actor, critics, cfg: DDPGConfig):
     bias = measure_bias(actor, critics, cfg, seed=cfg.seed * 10_000_000 + result.step)
     log["evaluations"].append(
@@ -274,21 +233,15 @@ def log_evaluation(log: dict, result, actor, critics, cfg: DDPGConfig):
         flush=True,
     )
 
-
-# ---------------------------------------------------------------------------
 # DDPG
-# ---------------------------------------------------------------------------
-
 
 def run_ddpg(cfg: DDPGConfig) -> dict:
     torch.manual_seed(cfg.seed)
     env = VecEnv(cfg.env_name, cfg.n_envs, seed=cfg.seed)
 
-    # The actor, the critic and its target
     actor = ContinuousDeterministicActor(
         env.observation_dim, cfg.actor_hidden, env.action_dim
     )
-    # [CHANGED] layernorm option
     critic = ContinuousQNetwork(
         env.observation_dim, cfg.critic_hidden, env.action_dim, cfg.layernorm
     )
@@ -297,15 +250,13 @@ def run_ddpg(cfg: DDPGConfig) -> dict:
     actor_optimizer = torch.optim.Adam(actor.parameters(), lr=cfg.lr_actor)
     critic_optimizer = torch.optim.Adam(critic.parameters(), lr=cfg.lr_critic)
 
-    # Data collection (with exploration noise), replay buffer and evaluation
     collector = TransitionCollector(env, GaussianNoise(actor, cfg.action_noise))
     buffer = ReplayBuffer(cfg.buffer_size)
-    # [CHANGED] no tensorboard / video directory: results go to the JSON log
     evaluator = Evaluator(
         VecEnv(cfg.env_name, cfg.n_eval_envs, seed=cfg.seed + 100),
         every=cfg.eval_interval,
     )
-    log = {"config": asdict(cfg), "algo": "ddpg", "evaluations": []}  # [NEW]
+    log = {"config": asdict(cfg), "algo": "ddpg", "evaluations": []}
 
     while collector.steps < cfg.max_steps:
         buffer.add(collector.collect(cfg.steps_per_update))
@@ -324,7 +275,7 @@ def run_ddpg(cfg: DDPGConfig) -> dict:
         critic_loss.backward()
         critic_optimizer.step()
 
-        # Update the actor (maximize Q(s, pi(s)))
+        # Update the actor
         actor_loss = compute_actor_loss(critic(batch.obs, actor(batch.obs).value))
 
         actor_optimizer.zero_grad()
@@ -335,27 +286,21 @@ def run_ddpg(cfg: DDPGConfig) -> dict:
         soft_update(critic, target_critic, cfg.tau)
 
         if result := evaluator.run_if_needed(collector.steps, actor):
-            log_evaluation(log, result, actor, {"q": critic}, cfg)  # [NEW]
+            log_evaluation(log, result, actor, {"q": critic}, cfg)
 
     return log
 
-
-# ---------------------------------------------------------------------------
 # TD3
-# ---------------------------------------------------------------------------
-
 
 def run_td3(cfg: TD3Config) -> dict:
     torch.manual_seed(cfg.seed)
     env = VecEnv(cfg.env_name, cfg.n_envs, seed=cfg.seed)
 
-    # Create the actor, the two critics, their targets and the optimizers
     actor = ContinuousDeterministicActor(
         env.observation_dim, cfg.actor_hidden, env.action_dim
     )
     target_actor = copy.deepcopy(actor)
 
-    # [CHANGED] layernorm option
     critic_1 = ContinuousQNetwork(
         env.observation_dim, cfg.critic_hidden, env.action_dim, cfg.layernorm
     )
@@ -373,12 +318,12 @@ def run_td3(cfg: TD3Config) -> dict:
 
     collector = TransitionCollector(env, GaussianNoise(actor, cfg.action_noise))
     buffer = ReplayBuffer(cfg.buffer_size)
-    # [CHANGED] no tensorboard / video directory: results go to the JSON log
+    
     evaluator = Evaluator(
         VecEnv(cfg.env_name, cfg.n_eval_envs, seed=cfg.seed + 100),
         every=cfg.eval_interval,
     )
-    log = {"config": asdict(cfg), "algo": "td3", "evaluations": []}  # [NEW]
+    log = {"config": asdict(cfg), "algo": "td3", "evaluations": []} 
 
     updates = 0
     while collector.steps < cfg.max_steps:
@@ -388,7 +333,6 @@ def run_td3(cfg: TD3Config) -> dict:
 
         batch = buffer.sample(cfg.batch_size)
 
-        # 1. Critic update: compute the common target with the target actor
         with torch.no_grad():
             action = target_actor(batch.next_obs).value
             noise = (torch.randn_like(action) * cfg.target_noise).clamp(
@@ -410,7 +354,6 @@ def run_td3(cfg: TD3Config) -> dict:
         critic_optimizer.step()
         updates += 1
 
-        # 2. Delayed policy update (and target updates)
         if updates % cfg.policy_delay == 0:
             actor_loss = compute_actor_loss(critic_1(batch.obs, actor(batch.obs).value))
             actor_optimizer.zero_grad()
@@ -422,16 +365,11 @@ def run_td3(cfg: TD3Config) -> dict:
             soft_update(critic_2, target_critic_2, cfg.tau)
 
         if result := evaluator.run_if_needed(collector.steps, actor):
-            # [NEW] the bias of both critics (and of their min) is recorded
             log_evaluation(log, result, actor, {"q1": critic_1, "q2": critic_2}, cfg)
 
     return log
 
-
-# ---------------------------------------------------------------------------
-# [NEW] Command line
-# ---------------------------------------------------------------------------
-
+# Command line
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
