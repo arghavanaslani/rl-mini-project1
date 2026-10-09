@@ -3,8 +3,30 @@ DDPG  final_reward             without LN    -77.3 ±   76.4 (n=5)  with LN   -1
 TD3   final_reward             without LN    137.7 ±   81.1 (n=5)  with LN    154.3 ±   65.3 (n=5)  Welch t=  0.36 p=0.7306  Mann-Whitney U=13.0 p=1.0000
 DDPG  final_bias               without LN    204.9 ±   56.2 (n=5)  with LN    382.6 ±   96.2 (n=5)  Welch t=  3.57 p=0.0105  Mann-Whitney U=23.0 p=0.0317
 TD3   final_bias               without LN    -19.2 ±   17.8 (n=5)  with LN    -11.4 ±   14.4 (n=5)  Welch t=  0.75 p=0.4743  Mann-Whitney U=15.0 p=0.6905
-DDPG  mean_bias_over_training  without LN    232.1 ±   79.6 (n=5)  with LN    337.5 ±   43.9 (n=5)  Welch t=  2.59 p=0.0396  Mann-Whitney U=22.0 p=0.0556
-TD3   mean_bias_over_training  without LN    -14.1 ±   15.0 (n=5)  with LN     -2.5 ±    6.5 (n=5)  Welch t=  1.59 p=0.1685  Mann-Whitney U=18.0 p=0.3095
+DDPG  mean_bias_over_training  without LN    237.8 ±   82.4 (n=5)  with LN    346.9 ±   45.4 (n=5)  Welch t=  2.59 p=0.0396  Mann-Whitney U=22.0 p=0.0556
+TD3   mean_bias_over_training  without LN    -17.2 ±   15.6 (n=5)  with LN     -5.2 ±    6.6 (n=5)  Welch t=  1.58 p=0.1697  Mann-Whitney U=18.0 p=0.3095
+
+TD3 vs DDPG (mean ± std over seeds; two-sided tests)
+no LN   final_reward             DDPG    -77.3 ±   76.4 (n=5)  TD3    137.7 ±   81.1 (n=5)  Welch t=  4.32 p=0.0026  Mann-Whitney U=24.0 p=0.0159
+with LN final_reward             DDPG   -100.0 ±   76.2 (n=5)  TD3    154.3 ±   65.3 (n=5)  Welch t=  5.67 p=0.0005  Mann-Whitney U=25.0 p=0.0079
+no LN   final_bias               DDPG    204.9 ±   56.2 (n=5)  TD3    -19.2 ±   17.8 (n=5)  Welch t= -8.49 p=0.0005  Mann-Whitney U= 0.0 p=0.0079
+with LN final_bias               DDPG    382.6 ±   96.2 (n=5)  TD3    -11.4 ±   14.4 (n=5)  Welch t= -9.06 p=0.0007  Mann-Whitney U= 0.0 p=0.0079
+no LN   mean_bias_over_training  DDPG    237.8 ±   82.4 (n=5)  TD3    -17.2 ±   15.6 (n=5)  Welch t= -6.80 p=0.0019  Mann-Whitney U= 0.0 p=0.0079
+with LN mean_bias_over_training  DDPG    346.9 ±   45.4 (n=5)  TD3     -5.2 ±    6.6 (n=5)  Welch t=-17.14 p=0.0001  Mann-Whitney U= 0.0 p=0.0079
+
+Holm correction over the 12 Welch tests above
+DDPG: LN vs no LN, final_reward                      p=0.6512  p_Holm=1.0000
+TD3: LN vs no LN, final_reward                       p=0.7306  p_Holm=1.0000
+DDPG: LN vs no LN, final_bias                        p=0.0105  p_Holm=0.0628
+TD3: LN vs no LN, final_bias                         p=0.4743  p_Holm=1.0000
+DDPG: LN vs no LN, mean_bias_over_training           p=0.0396  p_Holm=0.1982
+TD3: LN vs no LN, mean_bias_over_training            p=0.1697  p_Holm=0.6787
+TD3 vs DDPG (no LN), final_reward                    p=0.0026  p_Holm=0.0180
+TD3 vs DDPG (with LN), final_reward                  p=0.0005  p_Holm=0.0051
+TD3 vs DDPG (no LN), final_bias                      p=0.0005  p_Holm=0.0050
+TD3 vs DDPG (with LN), final_bias                    p=0.0007  p_Holm=0.0060
+TD3 vs DDPG (no LN), mean_bias_over_training         p=0.0019  p_Holm=0.0151
+TD3 vs DDPG (with LN), mean_bias_over_training       p=0.0001  p_Holm=0.0006
 
 Spearman correlation between final bias and final performance
 all runs  rho= -0.87  p=0.0000  (n=20)

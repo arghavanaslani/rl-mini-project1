@@ -12,9 +12,10 @@ Reads every `results/*.json` and writes, in `figures/`:
 - `bias_vs_performance.pdf/.png`: final bias vs final performance, one point
   per run
 - `runs.csv`: one row per run (final performance, final and average bias)
-- `stats.txt`: LayerNorm vs no LayerNorm tests, for each algorithm, and the
-  Spearman correlation between final bias and final performance (all runs,
-  and within each algorithm)
+- `stats.txt`: LayerNorm vs no LayerNorm tests, for each algorithm, TD3 vs
+  DDPG tests, for each condition, Holm-corrected p-values, and the Spearman
+  correlation between final bias and final performance (all runs, and within
+  each algorithm)
 
 Variability across seeds is shown as a 95% confidence interval of the mean
 (Student t, n = number of seeds).
@@ -61,10 +62,11 @@ def load_runs(results_dir: Path, td3_critic: str) -> list[dict]:
                 "algo": log["algo"],
                 "layernorm": log["config"]["layernorm"],
                 "seed": log["config"]["seed"],
+                "learning_starts": log["config"]["learning_starts"],
                 "steps": np.array([e["step"] for e in evaluations]),
                 "reward": np.array([e["mean_reward"] for e in evaluations]),
                 "bias": np.array([e["bias"][critic]["mean_bias"] for e in evaluations]),
-                "bias_std": np.array([e["bias"][critic]["std_bias"] for e in evaluations]),
+                "bias_std": np.array([e["bias"][critic].get("std_bias", np.nan) for e in evaluations]),
                 "mean_q": np.array([e["bias"][critic]["mean_q"] for e in evaluations]),
                 "return_mc": np.array([e["bias"]["mean_return_mc"] for e in evaluations]),
             }
@@ -144,6 +146,7 @@ def summarize(runs, last: int) -> list[dict]:
     """One row per run: final performance and bias (mean of the last evaluations)"""
     rows = []
     for r in runs:
+        trained = r["steps"] > r["learning_starts"]
         rows.append(
             {
                 "run": r["name"],
@@ -153,18 +156,23 @@ def summarize(runs, last: int) -> list[dict]:
                 "final_reward": r["reward"][-last:].mean(),
                 "final_bias": r["bias"][-last:].mean(),
                 "final_bias_std": r["bias_std"][-last:].mean(),
-                "mean_bias_over_training": r["bias"].mean(),
+                "mean_bias_over_training": r["bias"][trained].mean(),
             }
         )
     return rows
 
+def run_tests(a, b):
+    welch = stats.ttest_ind(a, b, equal_var=False)
+    mannwhitney = stats.mannwhitneyu(a, b, alternative="two-sided")
+    return welch, mannwhitney
 
-def compare(rows, algo: str, measure: str) -> str:
+def compare(rows, algo: str, measure: str, tests: list) -> str:
     """Welch t-test and Mann-Whitney U test, LayerNorm vs no LayerNorm"""
     without = np.array([r[measure] for r in rows if r["algo"] == algo and not r["layernorm"]])
     with_ln = np.array([r[measure] for r in rows if r["algo"] == algo and r["layernorm"]])
     welch = stats.ttest_ind(with_ln, without, equal_var=False)
     mannwhitney = stats.mannwhitneyu(with_ln, without, alternative="two-sided")
+    tests.append((f"{ALGO_NAMES[algo]}: LN vs no LN, {measure}", welch.pvalue))
     return (
         f"{ALGO_NAMES[algo]:5} {measure:24} "
         f"without LN {without.mean():8.1f} ± {without.std(ddof=1):6.1f} (n={len(without)})  "
@@ -173,6 +181,33 @@ def compare(rows, algo: str, measure: str) -> str:
         f"Mann-Whitney U={mannwhitney.statistic:4.1f} p={mannwhitney.pvalue:.4f}"
     )
 
+
+def compare_algos(rows, layernorm: bool, measure: str, tests: list) -> str:
+    """[ADDED] Welch t-test and Mann-Whitney U test, TD3 vs DDPG, same LN condition"""
+    ddpg = np.array([r[measure] for r in rows if r["algo"] == "ddpg" and r["layernorm"] == layernorm])
+    td3 = np.array([r[measure] for r in rows if r["algo"] == "td3" and r["layernorm"] == layernorm])
+    welch, mannwhitney = run_tests(td3, ddpg)
+    condition = "with LN" if layernorm else "no LN"
+    tests.append((f"TD3 vs DDPG ({condition}), {measure}", welch.pvalue))
+    return (
+        f"{condition:7} {measure:24} "
+        f"DDPG {ddpg.mean():8.1f} ± {ddpg.std(ddof=1):6.1f} (n={len(ddpg)})  "
+        f"TD3 {td3.mean():8.1f} ± {td3.std(ddof=1):6.1f} (n={len(td3)})  "
+        f"Welch t={welch.statistic:6.2f} p={welch.pvalue:.4f}  "
+        f"Mann-Whitney U={mannwhitney.statistic:4.1f} p={mannwhitney.pvalue:.4f}"
+    )
+ 
+ 
+def holm(pvalues: np.ndarray) -> np.ndarray:
+    """[ADDED] Holm-Bonferroni adjusted p-values (controls the family-wise error)"""
+    order = np.argsort(pvalues)
+    m = len(pvalues)
+    adjusted = np.empty(m)
+    running = 0.0
+    for rank, i in enumerate(order):
+        running = max(running, min(1.0, (m - rank) * pvalues[i]))
+        adjusted[i] = running
+    return adjusted
 
 def spearman(rows, algo: str | None) -> tuple[float, float, int]:
     """Spearman correlation between final bias and final performance"""
@@ -244,13 +279,28 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
 
+    measures = ("final_reward", "final_bias", "mean_bias_over_training")
+    tests = []
+
     lines = [
         f"LayerNorm vs no LayerNorm (mean ± std over seeds; two-sided tests; "
         f"final = mean of the last {args.last} evaluations; TD3 critic: {args.td3_critic})",
     ]
-    for measure in ("final_reward", "final_bias", "mean_bias_over_training"):
+    for measure in measures:
         for algo in ALGOS:
-            lines.append(compare(rows, algo, measure))
+            lines.append(compare(rows, algo, measure, tests))
+
+    lines.append("")
+    lines.append("TD3 vs DDPG (mean ± std over seeds; two-sided tests)")
+    for measure in measures:
+        for layernorm in (False, True):
+            lines.append(compare_algos(rows, layernorm, measure, tests))
+ 
+    adjusted = holm(np.array([p for _, p in tests]))
+    lines.append("")
+    lines.append(f"Holm correction over the {len(tests)} Welch tests above")
+    for (name, p), p_adj in zip(tests, adjusted):
+        lines.append(f"{name:52} p={p:.4f}  p_Holm={p_adj:.4f}")
 
     # Q2: does a larger bias go with a lower performance?
     correlations = {"all runs": spearman(rows, None)}
